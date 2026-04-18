@@ -1,0 +1,10 @@
+Flask==3.0.0
+Flask-CORS==4.0.0
+opencv-python==4.9.0.80
+Pillow==10.1.0
+numpy==1.26.2
+Werkzeug==3.0.1
+requests==2.31.0 
+openai
+PyPDF2
+reportlab
