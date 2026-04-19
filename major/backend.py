@@ -583,6 +583,7 @@ def create_triangle_mosaic(image, side_length, palette_size=4, use_dithering=Fal
     # 3. Process each triangle to find the best representative color
     # If dithering is on, we use the source-quantized image for sampling context.
     source_quantized = quantize_image(original_input_image, palette, dither=use_dithering)
+    color_counts = {str(c): 0 for c in palette}
 
     for row in range(num_rows):
         for col in range(num_cols):
@@ -609,13 +610,14 @@ def create_triangle_mosaic(image, side_length, palette_size=4, use_dithering=Fal
                 original_image=original_input_image,
                 precomputed_edges=precomputed_edges
             )
+            color_counts[str(triangle_color)] = color_counts.get(str(triangle_color), 0) + 1
 
             # Render triangle
             cv2.fillPoly(output, [pts], triangle_color)
             # Outline pieces to simulate the physical gaps in a Pyraminx mosaic
             cv2.polylines(output, [pts], isClosed=True, color=(0, 0, 0), thickness=1)
 
-    return output
+    return output, color_counts
 
 
 def segment_image_into_tiles(image_bgr, num_rows, num_cols):
@@ -697,14 +699,14 @@ def generate_mosaic():
         
         # Get parameters with defaults
         side_length = int(request.form.get('triangleSize', 20))
-        palette_size = 4  # Strictly limited to 4 colors
+        palette_size = int(request.form.get('paletteSize', 4))
         use_dithering = request.form.get('useDithering', 'false').lower() == 'true'
-        sampling_method = request.form.get('samplingMethod', 'mode')  # default set to mode for reliability
-        use_pyraminx_colors = True  # Strictly limited to Pyraminx colors
+        sampling_method = request.form.get('samplingMethod', 'edge_aware')
+        use_pyraminx_colors = request.form.get('usePyraminxColors', 'true').lower() == 'true'
         palette_method = request.form.get('paletteMethod', 'kmeans_lab')  # kmeans, kmeans_lab, pyraminx
         gamma_value_raw = request.form.get('gamma', '')
         gamma_value = float(gamma_value_raw) if gamma_value_raw not in (None, '') else None
-        enhanceForDetail = True  # Always enhance for detail by default
+        enhanceForDetail = request.form.get('enhanceForDetail', 'true').lower() == 'true'
 
         if sampling_method not in ['mode', 'mean', 'center', 'edge_aware']:
             sampling_method = 'mode'
@@ -762,7 +764,7 @@ def generate_mosaic():
             side_length = max(8, min_dim // 4)
 
         # Create mosaic
-        mosaic = create_triangle_mosaic(
+        mosaic, color_counts = create_triangle_mosaic(
             image,
             side_length,
             palette_size=palette_size,
@@ -778,6 +780,27 @@ def generate_mosaic():
         h, w = mosaic.shape[:2]
         tri_height = int(side_length * math.sqrt(3) / 2)
         total_triangles = ((w // (side_length // 2)) - 1) * (h // tri_height)
+        
+        # Calculate coverage (image matching fidelity percentage)
+        img_match = cv2.resize(image, (w, h))
+        img_lab = cv2.cvtColor(img_match, cv2.COLOR_BGR2LAB).astype(np.float32)
+        mosaic_lab = cv2.cvtColor(mosaic, cv2.COLOR_BGR2LAB).astype(np.float32)
+        
+        # Calculate Euclidean distance in Lab space (more perceptually accurate than BGR MSE)
+        dist = np.sqrt(np.sum((img_lab - mosaic_lab) ** 2, axis=2))
+        avg_dist = np.mean(dist)
+        # Normalize: Max distance in OpenCV Lab is ~255. 0 is perfect match.
+        coverage_score = max(0, 100 - (avg_dist / 255.0 * 100))
+
+        # Calculate MSE (Mean Squared Error) in BGR space
+        mse_value = np.mean((img_match.astype(np.float32) - mosaic.astype(np.float32)) ** 2)
+
+        # Calculate Edge Similarity using IoU (Intersection over Union) of edge maps
+        orig_edges = detect_edges_with_bilateral(img_match)
+        mosaic_edges = detect_edges_with_bilateral(mosaic)
+        intersection = np.logical_and(orig_edges > 0, mosaic_edges > 0).sum()
+        union = np.logical_or(orig_edges > 0, mosaic_edges > 0).sum()
+        edge_similarity = (intersection / union * 100) if union > 0 else 100.0
 
         # Encode mosaic to PNG in-memory to ensure consistent data URL format
         success, buffer = cv2.imencode('.png', mosaic)
@@ -795,7 +818,10 @@ def generate_mosaic():
             'mosaicImage': f"data:image/png;base64,{mosaic_base64}",
             'message': f'Mosaic generated successfully with triangle size {side_length}',
             'total_triangles': int(total_triangles),
-            'total_units': int(math.ceil(total_triangles / 9))
+            'total_units': int(math.ceil(total_triangles / 9)),
+            'coverage': round(coverage_score, 1),
+            'mse': float(mse_value),
+            'edge_similarity': round(edge_similarity, 1)
         })
         
     except Exception as e:
@@ -820,14 +846,14 @@ def generate_mosaic_pdf():
         num_cols = int(request.form.get('segmentsCols', 4))
         
         # Get improved parameters with defaults
-        palette_size = 4  # Strictly limited to 4 colors
+        palette_size = int(request.form.get('paletteSize', 4))
         use_dithering = request.form.get('useDithering', 'false').lower() == 'true'
-        sampling_method = request.form.get('samplingMethod', 'mode')
-        use_pyraminx_colors = True  # Strictly limited to Pyraminx colors
+        sampling_method = request.form.get('samplingMethod', 'edge_aware')
+        use_pyraminx_colors = request.form.get('usePyraminxColors', 'true').lower() == 'true'
         palette_method = request.form.get('paletteMethod', 'kmeans_lab')
         gamma_value_raw = request.form.get('gamma', '')
         gamma_value = float(gamma_value_raw) if gamma_value_raw not in (None, '') else None
-        enhanceForDetail = True  # Always enhance for detail by default
+        enhanceForDetail = request.form.get('enhanceForDetail', 'true').lower() == 'true'
 
         if num_rows < 1 or num_cols < 1:
             return jsonify({'error': 'segmentsRows and segmentsCols must be >= 1'}), 400

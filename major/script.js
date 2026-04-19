@@ -19,16 +19,16 @@ document.addEventListener('DOMContentLoaded', function() {
     const usePyraminxColors = document.getElementById('usePyraminxColors');
     const paletteSize = document.getElementById('paletteSize');
     const paletteSizeValue = document.getElementById('paletteSizeValue');
-    // Coverage preview removed — no DOM elements for stats anymore
+    const showGrid = document.getElementById('showGrid');
+    const compareMode = document.getElementById('compareMode');
     const downloadBtn = document.getElementById('downloadBtn');
     const pdfBtn = document.getElementById('pdfBtn');
     const segmentsRows = document.getElementById('segmentsRows');
     const segmentsCols = document.getElementById('segmentsCols');
-    // Removed on-screen grid overlay; grid will only appear in exported PDF
     const chooseBtn = document.getElementById('chooseBtn');
-    // comparison UI removed; preview shows coverage and piece count only
 
     let selectedFile = null;
+    let lastGenerationResult = null;
 
     // Update triangle size display
     triangleSize.addEventListener('input', function() {
@@ -165,9 +165,8 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('samplingMethod', samplingMethod.value);
             formData.append('paletteMethod', paletteMethod.value);
             formData.append('useDithering', useDithering.checked);
-            // pyraminx options
-            formData.append('usePyraminxColors', 'true');
-            formData.append('paletteSize', '4');
+            formData.append('usePyraminxColors', usePyraminxColors.checked);
+            formData.append('paletteSize', paletteSize.value);
 
             const response = await fetch('/api/generate-mosaic', {
                 method: 'POST',
@@ -177,9 +176,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
 
             if (result.success) {
+                lastGenerationResult = result;
                 mosaicImage.src = result.mosaicImage;
                 displayResults(result);
                 resultsSection.style.display = 'block';
+                updateViewMode();
             } else {
                 alert('Error: ' + result.error);
             }
@@ -195,12 +196,34 @@ document.addEventListener('DOMContentLoaded', function() {
     function displayResults(result) {
         const analysisStats = document.getElementById('analysisStats');
         if (analysisStats) {
+            const matchColor = result.coverage > 85 ? '#10b981' : (result.coverage > 70 ? '#f59e0b' : '#ef4444');
+            const edgeColor = result.edge_similarity > 30 ? '#10b981' : (result.edge_similarity > 15 ? '#f59e0b' : '#ef4444');
+            
             analysisStats.innerHTML = `
-                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem;">
+                <div class="stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
                     <div class="stat-card" style="border-left: 4px solid #3b82f6;">
                         <h5>Physical Pieces</h5>
                         <p><strong>${result.total_triangles}</strong> Triangles</p>
-                        <p style="font-size: 0.85em; color: #666;">(${result.total_units} Pyraminx Units)</p>
+                        <p style="font-size: 0.85em; color: #666;">(${result.total_units} Units)</p>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid ${matchColor};">
+                        <h5>Color Fidelity</h5>
+                        <p><strong>${result.coverage}%</strong> Match</p>
+                        <div style="width: 100%; height: 6px; background: #eee; border-radius: 3px; margin-top: 5px; overflow: hidden;">
+                            <div style="width: ${result.coverage}%; height: 100%; background: ${matchColor};"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid ${edgeColor};">
+                        <h5>Edge Similarity</h5>
+                        <p><strong>${result.edge_similarity}%</strong></p>
+                        <div style="width: 100%; height: 6px; background: #eee; border-radius: 3px; margin-top: 5px; overflow: hidden;">
+                            <div style="width: ${result.edge_similarity}%; height: 100%; background: ${edgeColor};"></div>
+                        </div>
+                    </div>
+                    <div class="stat-card" style="border-left: 4px solid #6366f1;">
+                        <h5>MSE</h5>
+                        <p><strong>${result.mse.toFixed(1)}</strong></p>
+                        <small style="color: #666;">Lower is better</small>
                     </div>
                 </div>
             `;
@@ -234,9 +257,8 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('samplingMethod', samplingMethod.value);
             formData.append('paletteMethod', paletteMethod.value);
             formData.append('useDithering', useDithering.checked);
-            // pyraminx options
-            formData.append('usePyraminxColors', 'true');
-            formData.append('paletteSize', '4');
+            formData.append('usePyraminxColors', usePyraminxColors.checked);
+            formData.append('paletteSize', paletteSize.value);
 
             const response = await fetch('/api/generate-mosaic-pdf', {
                 method: 'POST',
@@ -266,7 +288,71 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Removed grid overlay drawing and listeners
+    // Restoration of Preview Grid and Comparison logic
+    function updateViewMode() {
+        const mode = compareMode.value;
+        const grid = document.querySelector('.results-grid');
+        const cards = document.querySelectorAll('.result-card');
+        const mosaicContainer = mosaicImage.parentElement;
+        
+        if (mode === 'side-by-side') {
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = '1fr 1fr';
+            cards[0].style.display = 'block';
+            mosaicImage.style.opacity = '1';
+            mosaicContainer.style.background = 'none';
+        } else if (mode === 'mosaic-only') {
+            grid.style.display = 'block';
+            cards[0].style.display = 'none';
+            mosaicImage.style.opacity = '1';
+            mosaicContainer.style.background = 'none';
+        } else if (mode === 'overlay') {
+            grid.style.display = 'block';
+            cards[0].style.display = 'none';
+            mosaicContainer.style.backgroundImage = `url(${originalImage.src})`;
+            mosaicContainer.style.backgroundSize = 'contain';
+            mosaicContainer.style.backgroundRepeat = 'no-repeat';
+            mosaicImage.style.opacity = '0.5';
+        }
+        drawGridOverlay();
+    }
+
+    compareMode.addEventListener('change', updateViewMode);
+    showGrid.addEventListener('change', drawGridOverlay);
+
+    function drawGridOverlay() {
+        const existingGrid = document.getElementById('previewGridCanvas');
+        if (existingGrid) existingGrid.remove();
+        if (!showGrid.checked || !lastGenerationResult) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.id = 'previewGridCanvas';
+        canvas.style.position = 'absolute';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        mosaicImage.parentElement.appendChild(canvas);
+
+        canvas.width = mosaicImage.naturalWidth;
+        canvas.height = mosaicImage.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        const rows = parseInt(segmentsRows.value);
+        const cols = parseInt(segmentsCols.value);
+        
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        ctx.lineWidth = 2;
+        const cellW = canvas.width / cols;
+        const cellH = canvas.height / rows;
+
+        for(let i=1; i<cols; i++) {
+            ctx.beginPath(); ctx.moveTo(i * cellW, 0); ctx.lineTo(i * cellW, canvas.height); ctx.stroke();
+        }
+        for(let i=1; i<rows; i++) {
+            ctx.beginPath(); ctx.moveTo(0, i * cellH); ctx.lineTo(canvas.width, i * cellH); ctx.stroke();
+        }
+    }
 
     // Health check on page load
     async function checkBackendHealth() {

@@ -102,7 +102,12 @@
                     </div>
                 </details>
 
-                <!-- Coverage preview removed from UI -->
+                <div class="controls-grid" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee;">
+                    <div class="control-group checkbox-group">
+                        <label for="showGrid"><input type="checkbox" id="showGrid"> Show Alignment Grid Overlay</label>
+                        <small>Display a coordinate grid on the mosaic preview</small>
+                    </div>
+                </div>
 
                 <div class="controls-grid">
                     <div class="control-group">
@@ -120,6 +125,14 @@
 
             <div class="results-section" id="resultsSection" style="display: none;">
                 <h3>Results</h3>
+                <div class="view-controls" style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center;">
+                    <span>Comparison View:</span>
+                    <select id="compareMode" style="padding: 5px; border-radius: 4px; border: 1px solid #ddd;">
+                        <option value="side-by-side">Side by Side</option>
+                        <option value="mosaic-only">Mosaic Only</option>
+                        <option value="overlay">Flicker Overlay</option>
+                    </select>
+                </div>
                 <div class="results-grid">
                     <div class="result-card">
                         <h4>Original Image</h4>
