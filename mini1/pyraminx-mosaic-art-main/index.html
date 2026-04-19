@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pyraminx Mosaic Art</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpolygon points='32,6 58,58 6,58' fill='%2310b981'/%3E%3Cline x1='32' y1='6' x2='32' y2='58' stroke='%23065f46' stroke-width='3'/%3E%3Cline x1='6' y1='58' x2='58' y2='58' stroke='%23065f46' stroke-width='3'/%3E%3Cline x1='19' y1='32' x2='45' y2='32' stroke='%23065f46' stroke-width='3'/%3E%3C/svg%3E">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧩 Pyraminx Mosaic Art</h1>
+            <p>Transform your images into beautiful triangular mosaics</p>
+        </header>
+
+        <main>
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <div class="upload-icon">📷</div>
+                        <h3>Upload Image</h3>
+                        <p>Drag & drop or click to select an image</p>
+                        <input type="file" id="imageInput" accept="image/*" style="display: none;">
+                        <button class="upload-btn" id="chooseBtn" type="button">
+                            Choose File
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <h3>Settings</h3>
+                <div class="control-group">
+                    <label for="triangleSize">Triangle Size (pixels):</label>
+                    <input type="range" id="triangleSize" min="10" max="80" value="20" step="5">
+                    <span id="triangleSizeValue">20</span>
+                </div>
+
+                <!-- Coverage preview removed from UI -->
+
+                <button class="generate-btn" id="generateBtn" disabled>Generate Mosaic</button>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <h3>Results</h3>
+                <div class="results-grid">
+                    <div class="result-card">
+                        <h4>Original Image</h4>
+                        <div class="image-container">
+                            <img id="originalImage" alt="Original">
+                        </div>
+                    </div>
+                    <div class="result-card">
+                        <h4>Mosaic Preview</h4>
+                        <div class="image-container" style="position: relative;">
+                            <img id="mosaicImage" alt="Mosaic">
+                        </div>
+                    </div>
+                </div>
+                <div class="analysis-section" style="margin-top: 20px;">
+                    <h4>Image Matching Analysis</h4>
+                    <div class="stats-grid" id="analysisStats">
+                        <!-- Populated by script.js -->
+                    </div>
+                </div>
+                <div class="download-section">
+                    <button class="download-btn" id="downloadBtn">Download Mosaic</button>
+                </div>
+            </div>
+
+
+
+            <div class="loading" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Processing image...</p>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
